@@ -6,7 +6,6 @@ using System.Data;
 using System.Data.SqlClient;
 using System.Globalization;
 using System.IO;
-using System.Linq;
 using System.Text;
 
 namespace SubscriberEvents.Logic
@@ -67,18 +66,19 @@ namespace SubscriberEvents.Logic
         //se asigna la consulta de oracle que se ejecutara en procedimiento batch
         public static DataTable SetTableConsultOracle()
         {
-            
+
             using (SqlConnection conSql = new SqlConnection(GetConnectionSql()))
             {
                 using (OracleConnection conOracle = new OracleConnection(GetConnectionOracle()))
                 {
+                    Console.Title = "SubscriberEventsLogic";
                     Console.WriteLine("Inicio De consulta");
                     conOracle.Open();
                     List<string> listaConsulta = new List<string>();
                     string QueryMV;
                     string union;
                     string querySql = "select * from MM_DTMovistarP where ESTADO_ORDEN <> 'Cancelado' ";
-                    string queryOracle = "select * from MM_PGeneral where id = '9'";
+                    string queryOracle = "select * from MM_PGeneral where id = '4'";
                     SqlDataAdapter consultaHistorico = new SqlDataAdapter(querySql, conSql);
                     SqlDataAdapter consultaOracle = new SqlDataAdapter(queryOracle, conSql);
                     DataTable dataTableConsulta = new DataTable();
@@ -88,6 +88,7 @@ namespace SubscriberEvents.Logic
                     consultaHistorico.Fill(dataTableConsulta);
                     for (int i = 0; i <= dataTableConsulta.Rows.Count - 1; i++)
                     {
+                        
                         listaConsulta.Add("'" + dataTableConsulta.Rows[i]["NUMERO_CELULAR"].ToString() + "'");
                         if (listaConsulta.Count == 999 || i == dataTableConsulta.Rows.Count - 1)
                         {
@@ -100,7 +101,9 @@ namespace SubscriberEvents.Logic
                             dataTableOracle.Load(dr);
                             listaConsulta.Clear();
                             QueryMV = "";
+                            Console.WriteLine("dato: " + i);
                         }
+                        
                     }
                     Console.WriteLine("Fin De consulta");
                     conOracle.Close();
@@ -208,6 +211,7 @@ namespace SubscriberEvents.Logic
             {
                 Console.WriteLine("Enviando Archivo");
                 int cantidadColumnas;
+                int contador = 0;
                 DateTime fecha = DateTime.Now;
                 string fechaArchivo = DateTime.Now.ToString("dd-MM-yyyy");
                 string horaArchivo = DateTime.Now.ToString("HH-mm");
@@ -219,7 +223,7 @@ namespace SubscriberEvents.Logic
                 {
                     //StreamWriter servidorWrite = new StreamWriter(@"C:\Users\jsgomezpe2\Desktop\Trabajo Celula Axia\OneDrive - fractalia.es\archivos prueba\subscriber\SubscriberEvents_" + fechaArchivo + "_" + horaArchivo + ".csv", false, Encoding.UTF8)
                     //StreamWriter servidorWrite = new StreamWriter(@"E:\Documentos\SubscriberEvents_" + fechaArchivo + "_" + horaArchivo + ".csv", false, Encoding.UTF8)
-                    using(StreamWriter servidorWrite = new StreamWriter(@"E:\Documentos\SubscriberEvents_" + fechaArchivo + "_" + horaArchivo + ".csv", false, Encoding.UTF8))
+                    using (StreamWriter servidorWrite = new StreamWriter(@"E:\Documentos\SubscriberEvents_" + fechaArchivo + "_" + horaArchivo + ".csv", false, Encoding.UTF8))
                     {
                         cantidadColumnas = MovistarMoney.Columns.Count;
                         for (int ncolumna = 0; ncolumna < cantidadColumnas; ncolumna++)
@@ -245,6 +249,12 @@ namespace SubscriberEvents.Logic
                                 }
                             }
                             servidorWrite.Write(servidorWrite.NewLine); //saltamos linea
+                            contador++;
+                        }
+                        if (contador < MovistarMoney.Rows.Count)
+                        {
+                            string error = "No se envian todos los datos en el archivos";
+                            ErrorMessageArchivo(GenerateDate(), error);
                         }
                         servidorWrite.Close();
                         SendFile sendFilers = new SendFile();
@@ -286,7 +296,7 @@ namespace SubscriberEvents.Logic
             }
             catch (Exception ex)
             {
-                
+
                 Console.WriteLine("Error en conexion con SQL");
                 SqlConnection connectionSql = new SqlConnection();
                 connectionSql.Open();
@@ -302,7 +312,7 @@ namespace SubscriberEvents.Logic
         //metodo para realizar conexion con base de datos Oracle
         public static string GetConnectionOracle()
         {
-            
+
             try
             {
                 Connection connection = new Connection();
@@ -344,6 +354,28 @@ namespace SubscriberEvents.Logic
             }
             Console.WriteLine("Error Enviado a DB");
         }
-
+        //Mensaje de error
+        public static void ErrorMessageArchivo(string archivo, string error)
+        {
+            using (SqlConnection con = new SqlConnection(GetConnectionSql()))
+            {
+                con.Open();
+                string FechaArchivo = DateTime.Now.ToString("dd-MM-yyyy");
+                string horaArchivo = DateTime.Now.ToString("HH-mm");
+                string insert = "insert into Errors(Fecha,Problema,Consola) values ('" + FechaArchivo + "_" + horaArchivo + "','Error_ " + error + "_al crear el archivo SubscriberEvents_" + archivo + ".csv','SubscriberEvents')";
+                SqlCommand comando = new SqlCommand(insert, con);
+                comando.ExecuteNonQuery();
+                con.Close();
+            }
+            Console.WriteLine("Error Enviado a DB");
+        }
+        //Genera la fecha con la cual se va a guardar el archivo
+        public static string GenerateDate()
+        {
+            string fechaArchivo = DateTime.Now.ToString("dd-MM-yyyy");
+            string horaArchivo = DateTime.Now.ToString("HH-mm");
+            string archivo = "" + fechaArchivo + "_" + horaArchivo + "";
+            return archivo;
+        }
     }
 }
